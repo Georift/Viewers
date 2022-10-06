@@ -1,5 +1,7 @@
 import * as ContextMenuItemsBuilder from './ContextMenuItemsBuilder';
-import { ContextMenuMeasurements } from '@ohif/ui';
+import ContextMenu from './ContextMenu';
+
+type Obj = Record<string, unknown>;
 
 const getDefaultPosition = () => {
   return {
@@ -76,31 +78,23 @@ const _getDefaultPosition = (canvasPoints, eventDetail, viewerElement) => {
   return position;
 };
 
+/**
+ * The context menu controller is a helper class that knows how
+ * to manage context menus based on the UI Customization Service.
+ * There are a few parts to this:
+ *    1. Basic controls to manage displaying and hiding context menus
+ *    2. Menu selection services, which use the UI customization service
+ *       to choose which menu to display
+ *    3. Menu item adapter services to convert menu items into displayable and actionable items.
+ */
 export default class ContextMenuController {
-  commandsManager: Record<string, unknown>;
-  services: Record<string, unknown>;
+  commandsManager: Obj;
+  services: Obj;
+  menuItems: [];
 
-  constructor(servicesManager, commandsManager) {
-    this.services = servicesManager.services;
+  constructor(servicesManager: Obj, commandsManager: Obj) {
+    this.services = servicesManager.services as Obj;
     this.commandsManager = commandsManager;
-  }
-
-  /**
-   * Finds tool nearby event position triggered.
-   *
-   * @param {Object} commandsManager mannager of commands
-   * @param {Object} event that has being triggered
-   * @returns cs toolData or undefined if not found.
-   */
-  findNearbyToolData(commandsManager, event = {}) {
-    if (!event.detail) {
-      return;
-    }
-    const { element, currentPoints } = event.detail;
-    return commandsManager.runCommand('getNearbyToolData', {
-      element,
-      canvasCoordinates: currentPoints?.canvas,
-    });
   }
 
   closeViewerContextMenu() {
@@ -108,8 +102,8 @@ export default class ContextMenuController {
   }
 
   showContextMenu(
-    contextMenuProps: Record<string, unknown>,
-    activeViewerElement,
+    contextMenuProps: Obj,
+    activeViewerElement: Obj,
     defaultPointsPosition
   ): void {
     if (!this.services.UIDialogService) {
@@ -121,31 +115,18 @@ export default class ContextMenuController {
       event,
       subMenu,
       menuId,
-      nearbyToolData,
-      items,
+      menus,
       refs,
+      checkProps,
     } = contextMenuProps;
-    const _nearbyToolData =
-      nearbyToolData || this.findNearbyToolData(this.commandsManager, event);
 
-    const onGetMenuItems = (menus, refs, props) => {
-      // TODO - add display set and image metadata
-      // nearbyToolData is included both by name and value
-      // because the value version of it is used as the generic value copy,
-      // whereas the nearbyToolData is used by selector functions
-      return ContextMenuItemsBuilder.getMenuItems(
-        {
-          toolName: _nearbyToolData?.metadata?.toolName,
-          value: _nearbyToolData,
-          nearbyToolData: _nearbyToolData,
-        },
-        event,
-        menus,
-        refs,
-        props,
-        menuId
-      );
-    };
+    const items = ContextMenuItemsBuilder.getMenuItems(
+      checkProps || contextMenuProps,
+      event,
+      menus,
+      refs,
+      menuId
+    );
 
     this.services.UIDialogService.dismiss({ id: 'context-menu' });
     this.services.UIDialogService.create({
@@ -159,29 +140,29 @@ export default class ContextMenuController {
         activeViewerElement
       ),
       event,
-      content: ContextMenuMeasurements,
+      content: ContextMenu,
 
       onClickOutside: () =>
         this.services.UIDialogService.dismiss({ id: 'context-menu' }),
 
       contentProps: {
         items,
-        onGetMenuItems,
+        checkProps,
+        menus,
         event,
         subMenu,
         eventData: event?.detail,
         refs,
         onRunCommands: item => {
           const { commands } = item;
-          const { annotationUID: uid } = item.value; // TODO - make this annotationUID and ensure this works
 
           commands.forEach(command =>
             this.commandsManager.runCommand(
               command.commandName,
               {
                 ...command.commandOptions,
-                uid,
                 refs,
+                ...checkProps,
               },
               command.context
             )
@@ -215,7 +196,6 @@ export default class ContextMenuController {
 
         onDefault: (item, itemRef, subProps) => {
           const { commandName, commandOptions, context } = itemRef;
-          const { annotationUID: uid } = item.value;
 
           if (!commandName) {
             return;
@@ -226,7 +206,7 @@ export default class ContextMenuController {
             {
               ...itemRef,
               ...commandOptions,
-              uid,
+              ...checkProps,
               refs,
             },
             context

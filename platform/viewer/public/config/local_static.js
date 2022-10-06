@@ -71,6 +71,12 @@ window.config = {
   defaultDataSourceName: 'dicomweb',
   hotkeys: [
     {
+      commandName: 'showViewerContextMenu',
+      label: 'Show Viewer Context Menu',
+      keys: ['ctrl+d'],
+    },
+    // Now the default set
+    {
       commandName: 'incrementActiveViewport',
       label: 'Next Viewport',
       keys: ['right'],

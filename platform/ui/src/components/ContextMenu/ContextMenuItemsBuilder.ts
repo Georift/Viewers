@@ -47,21 +47,20 @@ export function findMenuDefault(menus: IMenu[], subProps: Types.IProps): IMenu {
  *
  * @param {Object[]} menus List of menus
  * @param {Object} props root props
- * @param {Object} subProps sub
+ * @param {Object} props sub
  * @param {string} [menuIdFilter] menu id identifier (to be considered on selection)
  * @returns
  */
 export function findMenu(
   menus: IMenu[],
-  props: Types.IProps = {},
-  subProps?: Types.IProps,
+  props?: Types.IProps,
   menuIdFilter?: string
 ) {
   const { subMenu } = props;
 
   function* findMenuIterator() {
     yield findMenuByMenuId(menus, menuIdFilter || subMenu);
-    yield findMenuDefault(menus, subProps);
+    yield findMenuDefault(menus, props);
   }
 
   const findIt = findMenuIterator();
@@ -90,7 +89,6 @@ export function findMenu(
  * @param {*} event event that originates the context menu
  * @param {*} menus List of menus
  * @param {*} refs Object containing references content of menus links
- * @param {*} props
  * @param {*} menuIdFilter
  * @returns
  */
@@ -99,14 +97,13 @@ export function getMenuItems(
   event,
   menus,
   refs,
-  props,
   menuIdFilter
 ) {
   // Include both the check props and the ...check props as one is used
   // by the child menu and the other used by the selector function
-  const subProps = { props, checkProps, event };
+  const subProps = { checkProps, event };
 
-  const menu = findMenu(menus, props, subProps, menuIdFilter);
+  const menu = findMenu(menus, subProps, menuIdFilter);
 
   if (!menu) {
     return undefined;
@@ -125,11 +122,11 @@ export function getMenuItems(
       if (delegating) {
         menuItems = [
           ...menuItems,
-          ...getMenuItems(checkProps, event, menus, refs, props, subMenu),
+          ...getMenuItems(checkProps, event, menus, refs, subMenu),
         ];
       } else {
         const _item = parseItemReferences(menu.attribute, item, refs);
-        const toAdd = adaptItem(menu.attribute, _item, props, subProps);
+        const toAdd = adaptItem(menu.attribute, _item, subProps);
         menuItems.push(toAdd);
       }
     }
@@ -171,21 +168,15 @@ export function parseItemReferences(linkedProperty, item, refs) {
  *
  * @param {string} linkedProperty string for linked property
  * @param {Object} item
- * @param {Object} componentProps
  * @param {Object} subProps
  * @returns
  */
-export function adaptItem(
-  linkedProperty,
-  item,
-  componentProps: Types.IProps = {},
-  subProps: Types.IProps = {}
-) {
+export function adaptItem(linkedProperty, item, subProps: Types.IProps = {}) {
   const newItem = { ...item, value: subProps.checkProps?.value };
   newItem.label = newItem.label || (newItem[linkedProperty] || {}).text;
 
   if (!item.action) {
-    newItem.action = itemRef => {
+    newItem.action = (itemRef, componentProps) => {
       const { event = {} } = componentProps;
       const { detail = {} } = event;
       newItem.element = detail.element;
@@ -193,7 +184,7 @@ export function adaptItem(
       componentProps.onClose();
       const action = componentProps[`on${itemRef.actionType || 'Default'}`];
       if (action) {
-        action.call(null, newItem, itemRef, subProps);
+        action.call(componentProps, newItem, itemRef, subProps);
       } else {
         console.warn('No action defined for', itemRef);
       }

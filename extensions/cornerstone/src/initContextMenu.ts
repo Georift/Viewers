@@ -1,7 +1,6 @@
 import { eventTarget, Types, EVENTS } from '@cornerstonejs/core';
 import { Enums } from '@cornerstonejs/tools';
 import { setEnabledElement } from './state';
-import { ContextMenuMeasurements } from '@ohif/ui';
 
 const cs3DToolsEvents = Enums.Events;
 
@@ -11,7 +10,6 @@ const showContextMenuDefault: Types.CommandUICustomization = {
       commandName: 'showViewerContextMenu',
       commandOptions: {
         menuName: 'cornerstoneContextMenu',
-        content: ContextMenuMeasurements,
       },
       context: 'CORNERSTONE',
     },
@@ -23,6 +21,24 @@ function initContextMenu({
   uiCustomizationService,
   commandsManager,
 }): void {
+  /**
+   * Finds tool nearby event position triggered.
+   *
+   * @param {Object} commandsManager mannager of commands
+   * @param {Object} event that has being triggered
+   * @returns cs toolData or undefined if not found.
+   */
+  const findNearbyToolData = evt => {
+    if (!evt?.detail) {
+      return;
+    }
+    const { element, currentPoints } = evt.detail;
+    return commandsManager.runCommand('getNearbyToolData', {
+      element,
+      canvasCoordinates: currentPoints?.canvas,
+    });
+  };
+
   const getShowContextMenu = (): Types.UICommand =>
     uiCustomizationService.getModeCustomization(
       'showContextMenu',
@@ -37,9 +53,10 @@ function initContextMenu({
   };
 
   const onRightClick = event => {
+    const nearbyToolData = findNearbyToolData(event);
     showContextMenu({
       event,
-      nearbyToolData: undefined,
+      nearbyToolData,
     });
   };
 

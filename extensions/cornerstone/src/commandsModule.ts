@@ -118,6 +118,7 @@ const commandsModule = ({ servicesManager, commandsManager }) => {
       const viewerElement = _getActiveEnabledElement();
 
       const options = { ...providedOptions };
+      const { event: evt } = options;
       const { useSelectedAnnotation, nearbyToolData, menuName } = options;
 
       if (menuName) {
@@ -146,6 +147,15 @@ const commandsModule = ({ servicesManager, commandsManager }) => {
           return;
         }
       }
+
+      // TODO - make the checkProps richer by including the study metadata and display set.
+      options.checkProps = {
+        toolName: options.nearbyToolData?.metadata?.toolName,
+        value: options.nearbyToolData,
+        uid: options.nearbyToolData?.annotationUID,
+        nearbyToolData: options.nearbyToolData,
+      };
+
       _showViewerContextMenu(viewerElement, options);
     },
 
