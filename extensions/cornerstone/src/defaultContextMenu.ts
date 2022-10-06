@@ -1,4 +1,3 @@
-import { ContextMenuMeasurements } from '@ohif/ui';
 import { Types } from '@ohif/core';
 
 const defaultContextMenu: Types.CommandUICustomization = {
