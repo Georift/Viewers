@@ -60,8 +60,8 @@
     "core-js": "^3.2.1",
     "@radicalimaging/hp-extension": "^3.4.2",
     "@radicalimaging/config-mode": "^3.4.2",
-    "@radicalimaging/volume-mode": "^3.4.3",
-    "@radicalimaging/findings-mode": "^3.4.3",
+    "@radicalimaging/volume-mode": "^3.4.2",
+    "@radicalimaging/findings-mode": "^3.4.2",
     "@radicalimaging/hp-mode": "^3.4.2"
   },
   "peerDependencies": {

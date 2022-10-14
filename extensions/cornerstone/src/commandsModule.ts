@@ -36,7 +36,6 @@ const commandsModule = ({ servicesManager, commandsManager }) => {
     HangingProtocolService,
   } = servicesManager.services;
 
-  console.log('* ContextMenu.Controller=', ContextMenu.Controller);
   const contextMenuController = new ContextMenu.Controller(
     servicesManager,
     commandsManager

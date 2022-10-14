@@ -52,6 +52,10 @@ export default class ToolBarService {
     this.buttons = {};
   }
 
+  onModeEnter() {
+    this.reset();
+  }
+
   /**
    *
    * @param {*} interaction - can be undefined to run nothing
@@ -66,10 +70,14 @@ export default class ToolBarService {
       case 'action': {
         commands.forEach(({ commandName, commandOptions, context }) => {
           if (commandName) {
-            commandsManager.runCommand(commandName,
+            commandsManager.runCommand(
+              commandName,
               {
-                ...commandOptions, ...extraOptions
-              }, context);
+                ...commandOptions,
+                ...extraOptions,
+              },
+              context
+            );
           }
         });
         break;

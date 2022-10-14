@@ -490,6 +490,11 @@ function createDicomWebApi(dicomWebConfig, UserAuthenticationService) {
       setSuccessFlag();
     },
     deleteStudyMetadataPromise,
+
+    /**
+     * Generates a list of image ids.
+     * @returns string[] containing the image ids
+     */
     getImageIdsForDisplaySet(displaySet) {
       const images = displaySet.images;
       const imageIds = [];

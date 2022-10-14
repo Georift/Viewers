@@ -1,7 +1,7 @@
 import merge from 'lodash.merge';
 import { PubSubService } from '../_shared/pubSubServiceInterface';
 import UITypeInfo from './UITypeInfo';
-import { UICustomization, UIConfiguration } from './types';
+import { UICustomization, UIConfiguration, ExtensionManager } from './types';
 import { ComponentType } from 'react';
 
 const EVENTS = {
@@ -9,18 +9,18 @@ const EVENTS = {
   GLOBAL_CUSTOMIZATION_MODIFIED: 'event::UICustomizationService:globalModified',
 };
 
+type Obj = Record<string, unknown>;
+
 interface UICustomizationConfiguration {
-  globalConfiguration?: string[];
+  whiteLabeling?: Obj;
 }
 
 type ComponentReturn = {
   component: ComponentType;
-  props?: Record<string, unknown>;
+  props?: Obj;
 };
 
 type NestedStrings = string[] | NestedStrings[];
-
-type CustomizationModuleEntry = UICustomization | UITypeInfo;
 
 const flattenNestedStrings = (
   strs: NestedStrings | string,
@@ -38,9 +38,35 @@ const flattenNestedStrings = (
   return ret;
 };
 
+/**
+ * The UICustomizationService allows for retrieving of custom components
+ * and configuration for mode and global values.
+ * The intent of the items is to provide a react component.  This can be
+ * done by straight out providing an entire react component or else can be
+ * done by configuring a react component, or configuring a part of a react
+ * component.  These are intended to be fairly indistinguishable in use of
+ * it, although the internals of how that is implemented may need to know
+ * about the customization service.
+ *
+ * A customization value can be:
+ *   1. React function, taking (React, props) and returning a rendered component
+ *      For example, createLogoComponentFn renders a component logo for display
+ *   2. Custom UI component configuration, as defined by the component which uses it.
+ *      For example, context menus define a complex structure allowing site-determined
+ *      context menus to be set.
+ *   3. A string name, being the extension id for retrieving one of the above.
+ *
+ * The default values for the extension come from the app_config value 'whiteLabeling',
+ * The whiteLabelling can have lists of extensions to load for the default global and
+ * mode extensions.  These are:
+ *    'globalExtensions' which is a list of extension id's to load for global values
+ *    'modeExtensions'   which is a list of extension id's to load for mode values
+ * They default to the list ['*'] if not otherwise provided, which means to check
+ * every module for the given id and to load it/add it to the extensions.
+ */
 export default class UICustomizationService extends PubSubService {
-  _commandsManager: Record<string, unknown>;
-  extensionManager: Record<string, unknown>;
+  commandsManager: Record<string, unknown>;
+  extensionManager: ExtensionManager;
 
   modeCustomizations: Record<string, UICustomization> = {};
   globalCustomizations: Record<string, UICustomization> = {};
@@ -49,20 +75,17 @@ export default class UICustomizationService extends PubSubService {
 
   constructor({ configuration, commandsManager }) {
     super(EVENTS);
-    this._commandsManager = commandsManager;
+    this.commandsManager = commandsManager;
     this.configuration = configuration;
   }
 
-  init(extensionManager): void {
+  public init(extensionManager: ExtensionManager): void {
     this.extensionManager = extensionManager;
-    this.readCustomizationTypes(
-      v => v.uiType == 'uiType' && v,
-      this.customizationTypes
-    );
-    this.setConfigGlobalCustomization(this.configuration);
+    this.initDefaults();
+    this.addReferences(this.configuration.whiteLabeling);
   }
 
-  reset(): void {
+  public onModeEnter(): void {
     super.reset();
     this.modeCustomizations = {};
   }
@@ -77,7 +100,7 @@ export default class UICustomizationService extends PubSubService {
     extraOptions?: Record<string, unknown>
   ): void {
     if (!interaction) return;
-    const commandsManager = this._commandsManager;
+    const commandsManager = this.commandsManager;
     const { commands = [] } = interaction;
 
     commands.forEach(({ commandName, commandOptions, context }) => {
@@ -98,14 +121,15 @@ export default class UICustomizationService extends PubSubService {
     });
   }
 
-  getModeCustomizations(): Record<string, UICustomization> {
+  public getModeCustomizations(): Record<string, UICustomization> {
     return this.modeCustomizations;
   }
 
-  setModeCustomization(
+  public setModeCustomization(
     customizationId: string,
     customization: UICustomization
   ): void {
+    console.log('** Set mode customziation', customizationId, customization);
     this.modeCustomizations[customizationId] = merge(
       this.modeCustomizations[customizationId] || {},
       customization
@@ -118,37 +142,36 @@ export default class UICustomizationService extends PubSubService {
 
   /** Mode customizations are changes to the behaviour of the extensions
    * when running in a given mode.  Reset clears mode customizations.
+   * Note that global customizations over-ride mode customizations.
    * @param defautlValue to return if no customization specified.
    */
-  getModeCustomization(
+  public getModeCustomization(
     customizationId: string,
     defaultValue?: UICustomization
   ): UICustomization | void {
-    return this.modeCustomizations[customizationId] ?? defaultValue;
+    const customization =
+      this.globalCustomizations[customizationId] ??
+      this.modeCustomizations[customizationId] ??
+      defaultValue;
+    return this.applyUiType(customization);
   }
 
-  loadModeCustomizations(...config: NestedStrings): void {
-    this.modeCustomizations = {};
-    const keys = flattenNestedStrings(config);
-    this.readCustomizationTypes(
-      v => keys[v.name] && v.customization,
-      this.modeCustomizations
-    );
-
-    // TODO - iterate over customizations, loading them from the extension
-    // manager.
-    this._broadcastModeCustomizationModified();
+  /** Applies any inheritance due to UI Type customization */
+  public applyUiType(customization) {
+    if (!customization) return customization;
+    const { uiType } = customization;
+    if (!uiType) return customization;
+    const parent = this.getModeCustomization(uiType);
+    return parent
+      ? Object.assign(Object.create(parent), customization)
+      : customization;
   }
 
-  addModeCustomizations(modeCustomizations: UICustomization[]): void {
+  public addModeCustomizations(modeCustomizations): void {
     if (!modeCustomizations) {
       return;
     }
-    modeCustomizations.forEach(entry => {
-      if (!this.modeCustomizations[entry.id]) {
-        this.modeCustomizations[entry.id] = entry;
-      }
-    });
+    this.addReferences(modeCustomizations, false);
 
     this._broadcastModeCustomizationModified();
   }
@@ -168,10 +191,11 @@ export default class UICustomizationService extends PubSubService {
     id: string,
     defaultValue?: UICustomization
   ): UICustomization | void {
-    return this.globalCustomizations[id] ?? defaultValue;
+    return this.applyUiType(this.globalCustomizations[id] ?? defaultValue);
   }
 
   setGlobalCustomization(id: string, value: UICustomization): void {
+    console.log('*** Set global', id, value);
     this.globalCustomizations[id] = value;
     this._broadcastGlobalCustomizationModified();
   }
@@ -201,6 +225,62 @@ export default class UICustomizationService extends PubSubService {
     });
   }
 
+  findExtensionValue(value: string) {
+    const entry = this.extensionManager.getModuleEntry(value);
+    return entry;
+  }
+
+  initDefaults() {
+    this.extensionManager.registeredExtensionIds.forEach(extensionId => {
+      const key = `${extensionId}.customizationModule.default`;
+      const defaultCustomizations = this.findExtensionValue(key);
+      if (!defaultCustomizations) return;
+      const { value } = defaultCustomizations;
+      this.addReference(value, true);
+    });
+  }
+
+  /**
+   * A single reference is either an an array, or a single customization value,
+   * whose id is the id in the object, or the parent id.
+   * This allows for general use to register customizationModule entries.
+   */
+  addReference(value?: Obj | Obj[] | string, isGlobal = true, id?: string) {
+    if (!value) return;
+    if (typeof value === 'string') {
+      const extensionValue = this.findExtensionValue(value);
+      console.log('Adding extension values', value, extensionValue);
+      this.addReferences(extensionValue);
+    } else if (Array.isArray(value)) {
+      this.addReferences(value, isGlobal);
+    } else {
+      const useId = value.id || id;
+      this[isGlobal ? 'setGlobalCustomization' : 'setModeCustomization'](
+        useId as string,
+        value
+      );
+    }
+  }
+
+  /** References are:
+   * list of customizations, added in order
+   * object containing a customization id and value
+   * This format allows for the origina whitelist format.
+   */
+  addReferences(references?: Obj | Obj[], isGlobal = true): void {
+    if (!references) return;
+    if (Array.isArray(references)) {
+      references.forEach(item => {
+        this.addReference(item, isGlobal);
+      });
+    } else {
+      for (const key of Object.keys(references)) {
+        const value = references[key];
+        this.addReference(value, isGlobal, key);
+      }
+    }
+  }
+
   /** Gets the component and props value for the component from a
    * UICustomization object, taking into account the default type info.
    */
@@ -217,29 +297,5 @@ export default class UICustomizationService extends PubSubService {
       unknown
     >;
     return { component, props };
-  }
-
-  // Add registration for uiType - should it auto-register?
-  protected readCustomizationTypes(
-    readValue: (v: CustomizationModuleEntry) => UITypeInfo | UICustomization,
-    dest: Record<string, unknown>
-  ): void {
-    const registeredCustomizationModules = this.extensionManager.modules[
-      'uiCustomizationModule'
-    ];
-
-    if (
-      Array.isArray(registeredCustomizationModules) &&
-      registeredCustomizationModules.length
-    ) {
-      registeredCustomizationModules.forEach(customizationModule =>
-        customizationModule.module.forEach(def => {
-          console.log('Checking', def, 'in', keys);
-          const assignValue = readValue(def);
-          if (!assignValue) return;
-          dest[def.id] = assignValue;
-        })
-      );
-    }
   }
 }

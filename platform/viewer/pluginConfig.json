@@ -33,6 +33,10 @@
       "version": "3.3.1"
     },
     {
+      "packageName": "@radicalimaging/overlays-extension",
+      "version": "3.0.0"
+    },
+    {
       "packageName": "@radicalimaging/tree-metadata",
       "version": "3.0.0"
     }
@@ -48,6 +52,10 @@
     },
     {
       "packageName": "@radicalimaging/volume-mode",
+      "version": "3.4.0"
+    },
+    {
+      "packageName": "@radicalimaging/veterinary-mode",
       "version": "3.4.0"
     },
     {

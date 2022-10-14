@@ -1,6 +1,10 @@
 window.config = {
   routerBasename: '/',
-  // whiteLabelling: {},
+  whiteLabeling: {
+    logoComponent: {
+      label: 'FlexView',
+    },
+  },
   extensions: [],
   modes: [],
   showStudyList: true,
@@ -24,6 +28,7 @@ window.config = {
         supportsFuzzyMatching: false,
         supportsWildcard: true,
         staticWado: true,
+        // Add image to fetch single part
         singlepart: 'bulkdata,video,pdf',
       },
     },

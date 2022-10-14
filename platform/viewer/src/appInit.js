@@ -52,7 +52,7 @@ async function appInit(appConfigOrFunc, defaultExtensions, defaultModes) {
     UIViewportDialogService,
     MeasurementService,
     DisplaySetService,
-    UICustomizationServiceRegistration,
+    [UICustomizationServiceRegistration, appConfig],
     ToolBarService,
     ViewportGridService,
     HangingProtocolService,
